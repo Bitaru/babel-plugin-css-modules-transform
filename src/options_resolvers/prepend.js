@@ -1,4 +1,4 @@
-import { isFunction, isModulePath, requireLocalFileOrNodeModule } from '../utils';
+import { isFunction, isString, isModulePath, requireLocalFileOrNodeModule } from '../utils';
 
 /**
  * Resolves prepend option for css-modules-require-hook
@@ -7,22 +7,29 @@ import { isFunction, isModulePath, requireLocalFileOrNodeModule } from '../utils
  * @returns {Function}
  */
 export default function prepend(value/* , currentConfig */) {
+    let plugins = [];
     if (Array.isArray(value)) {
-        return value.map((option, index) => {
-            if (isFunction(option)) {
-                return option();
-            } else if (isModulePath(option)) {
-                const requiredOption = requireLocalFileOrNodeModule(option);
+        for (let index = 0; index < value.length; index++) {
+            const option = value[index];
+            if (isFunction(option)) return plugins.push(option());
 
-                if (!isFunction(requiredOption)) {
-                    throw new Error(`Configuration 'prepend[${index}]' module is not exporting a function`);
-                }
-
-                return requiredOption();
+            const requiredOption = requireLocalFileOrNodeModule(option);
+            if (!isFunction(requiredOption)) {
+                throw new Error(`Configuration 'prepend[${index}]' module is not exporting a function`);
             }
+            const returnedOptions = requiredOption();
+            plugins = [...plugins, ...(returnedOptions.plugins || returnedOptions)];
+        }
+        return plugins;
+    }
 
-            throw new Error(`Configuration 'prepend[${index}]' is not a function or a valid module path`);
-        });
+    if (isString(value)) {
+        const requiredOption = requireLocalFileOrNodeModule(value);
+        if (!isFunction(requiredOption)) {
+            throw new Error(`Configuration 'prepend' module is not exporting a function`);
+        }
+        const returnedOptions = requiredOption();
+        return returnedOptions.plugins || returnedOptions;
     }
 
     throw new Error(`Configuration 'prepend' is not an array`);
